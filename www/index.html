@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RecoSave AI - Financial Assistant</title>
+    <!-- Link to external CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray-100 min-h-screen flex items-center justify-center p-4">
+
+    <div id="app-container" class="w-full max-w-md bg-white shadow-2xl rounded-2xl overflow-hidden min-h-[600px] flex flex-col">
+        
+        <!-- Global Header -->
+        <header id="app-header" class="p-4 bg-primary text-white flex justify-between items-center shadow-lg">
+            <h1 class="text-xl font-bold flex-1">RecoSave AI</h1>
+            <div class="flex space-x-3">
+                <!-- Help and Logout buttons are always present on main screens -->
+                <button id="help-button" class="text-sm bg-primary-light hover:bg-primary p-1 px-3 rounded-full hidden" onclick="navigate('help')">Help</button>
+                <button id="logout-button" class="text-sm bg-primary-light hover:bg-primary p-1 px-3 rounded-full hidden" onclick="logout()">Logout</button>
+            </div>
+        </header>
+
+        <!-- Screen 1: Login -->
+        <div id="screen-login" class="app-screen active p-6 flex-col space-y-6">
+            <h2 class="text-3xl font-bold text-gray-800">Login Now</h2>
+            <form id="login-form" class="space-y-4">
+                <input type="text" id="login-username" placeholder="Username" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                <input type="password" id="login-password" placeholder="Password" required class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary focus:border-primary">
+                <button type="submit" class="w-full bg-primary hover:bg-primary-light text-white font-bold p-3 rounded-lg transition duration-150">Login</button>
+                <p class="text-center text-sm text-gray-500">Don't have an account? <button type="button" onclick="navigate('register')" class="text-primary font-semibold">Sign Up</button></p>
+                <p id="login-message" class="text-center text-sm font-medium"></p>
+            </form>
+        </div>
+
+        <!-- Screen 2: Register -->
+        <div id="screen-register" class="app-screen p-6 flex-col space-y-4">
+            <h2 class="text-3xl font-bold text-gray-800">Sign Up Now</h2>
+            <form id="register-form" class="space-y-3">
+                <input type="text" id="reg-username" placeholder="Username" required class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                <input type="password" id="reg-password" placeholder="Password" required class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                <input type="number" id="reg-salary" placeholder="Monthly Gross Salary (e.g., 50000)" required class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                <input type="number" id="reg-age" placeholder="Age (e.g., 22)" required class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                <select id="reg-gender" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="male">Male</option>
+                    <option value="female">Female</option>
+                </select>
+                <select id="reg-goal" class="w-full p-2 border border-gray-300 rounded-lg text-sm">
+                    <option value="long-term">Long-Term Growth (Retirement)</option>
+                    <option value="tax-savings">Tax Savings</option>
+                    <option value="regular-income">Regular Monthly Income</option>
+                </select>
+                <button type="submit" class="w-full bg-success hover:bg-primary-light text-white font-bold p-3 rounded-lg transition duration-150">Create Account</button>
+                <p class="text-center text-sm text-gray-500">Already have an account? <button type="button" onclick="navigate('login')" class="text-primary font-semibold">Login</button></p>
+                <p id="reg-message" class="text-center text-sm font-medium"></p>
+            </form>
+        </div>
+
+        <!-- Screen 3: Dashboard (The Main App Screen) -->
+        <div id="screen-dashboard" class="app-screen p-4 flex-col space-y-4 flex-1 overflow-y-auto">
+            <h2 class="text-xl font-bold text-gray-800 border-b pb-2">Welcome, <span id="dashboard-username">User!</span></h2>
+            
+            <!-- My Enrolled Schemes -->
+            <div class="p-3 bg-primary-accent rounded-lg shadow-inner">
+                <h3 class="font-semibold text-primary">My Enrolled Schemes</h3>
+                <div id="enrolled-schemes-container" class="space-y-1 mt-1 text-sm min-h-[30px]">
+                    <p class="text-gray-500 text-xs">No schemes saved yet. Use search to save one!</p>
+                </div>
+            </div>
+
+            <!-- Profile Summary / Edit Button -->
+            <div class="p-4 bg-yellow-50 border border-yellow-200 rounded-lg shadow-sm flex justify-between items-center">
+                <div>
+                    <h3 class="font-semibold text-base text-gray-700">Profile Status</h3>
+                    <p id="profile-summary" class="text-sm text-yellow-800 mt-1">Loading profile...</p>
+                </div>
+                <button onclick="navigate('profile-update')" class="bg-primary text-white text-sm px-3 py-1 rounded-full hover:opacity-90 transition duration-150">
+                    Edit Profile
+                </button>
+            </div>
+
+
+            <!-- Search Bar -->
+            <div class="relative shadow-md rounded-full bg-white border border-gray-200">
+                <input type="text" id="search-input" placeholder="Search scheme by name or goal..." 
+                    oninput="debounceSearch()" 
+                    class="w-full p-3 pl-10 text-sm bg-transparent rounded-full focus:outline-none focus:ring-2 focus:ring-primary">
+                <svg class="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            </div>
+
+            <!-- Search Results -->
+            <div id="search-results-container" class="space-y-3">
+                <h3 class="text-lg font-semibold text-gray-700">Popular Schemes:</h3>
+            </div>
+            
+            <!-- Recommendations Area (Main AI Feature) -->
+            <h3 class="text-lg font-semibold text-gray-700 border-t pt-4 mt-4">AI Financial Advice:</h3>
+            <div id="recommendation-results" class="p-4 bg-primary-accent rounded-lg shadow-inner min-h-[150px]">
+                <button onclick="getRecommendation()" class="w-full bg-primary hover:bg-primary-light text-white font-bold p-3 rounded-lg transition duration-150">Run AI Analysis</button>
+                <p class="text-gray-500 mt-2 text-sm text-center">Click to get your personalized schemes.</p>
+            </div>
+
+        </div>
+
+        <!-- Screen 4: Profile Update (New Screen) -->
+        <div id="screen-profile-update" class="app-screen p-6 flex-col space-y-6 overflow-y-auto">
+            <h2 class="text-3xl font-bold text-gray-800">Update Profile & Security</h2>
+            <button onclick="navigate('dashboard')" class="text-sm text-primary font-semibold flex items-center mb-4">
+                 &larr; Back to Dashboard
+            </button>
+            
+            <!-- 1. Profile Data Update Form -->
+            <div class="p-4 border border-gray-200 rounded-lg">
+                <h3 class="text-xl font-semibold text-primary mb-3">Update Profile Data</h3>
+                <form id="update-form" class="space-y-4">
+                    <input type="number" id="update-salary" placeholder="Monthly Salary (e.g., 60000)" class="w-full p-3 border border-gray-300 rounded-lg">
+                    <input type="number" id="update-age" placeholder="Age (e.g., 35)" class="w-full p-3 border border-gray-300 rounded-lg">
+                    <select id="update-gender" class="w-full p-3 border border-gray-300 rounded-lg">
+                        <option value="male">Male</option>
+                        <option value="female">Female</option>
+                        <option value="other">Other</option>
+                    </select>
+                    <select id="update-goal" class="w-full p-3 border border-gray-300 rounded-lg">
+                        <option value="long-term">Long-Term Growth (Retirement)</option>
+                        <option value="tax-savings">Tax Savings</option>
+                        <option value="regular-income">Regular Monthly Income</option>
+                        <option value="child-future">Child's Future (Education/Marriage)</option>
+                    </select>
+                    <button type="submit" class="w-full bg-primary hover:bg-primary-dark text-white font-bold p-3 rounded-lg transition duration-150">Save Changes</button>
+                    <p id="update-message" class="text-center text-sm font-medium"></p>
+                </form>
+            </div>
+            
+            <!-- 2. Change Password Form (Security Feature) -->
+            <div class="border-t border-gray-200 pt-6 mt-6">
+                <h3 class="text-xl font-semibold text-primary">Change Password</h3>
+                <form id="change-password-form" class="space-y-4 mt-3">
+                    <input type="password" id="new-password" placeholder="New Password" required class="w-full p-3 border border-gray-300 rounded-lg">
+                    <input type="password" id="confirm-password" placeholder="Confirm New Password" required class="w-full p-3 border border-gray-300 rounded-lg">
+                    <button type="submit" class="w-full bg-error hover:bg-error-dark text-white font-bold p-3 rounded-lg transition duration-150">Change Password</button>
+                    <p id="password-change-message" class="text-center text-sm font-medium"></p>
+                </form>
+            </div>
+        </div>
+
+        <!-- Screen 5: Help/FAQ -->
+        <div id="screen-help" class="app-screen p-6 flex-col space-y-4 overflow-y-auto">
+            <button onclick="navigate('dashboard')" class="text-sm text-primary font-semibold mb-4 flex items-center">
+                 &larr; Back to Dashboard
+            </button>
+            <h2 class="text-3xl font-bold text-gray-800">Help & Support</h2>
+            <div class="space-y-4 text-gray-700">
+                <p>If you have any issues, please check the following FAQs:</p>
+                
+                <h4 class="font-semibold text-primary">Q: Why are my schemes disappearing?</h4>
+                <p class="text-sm">A: Schemes are saved permanently to our database. If they disappear, ensure your Flask server is running and you have successfully logged in.</p>
+                
+                <h4 class="font-semibold text-primary">Q: Why do I see an 'AI Analysis Error'?</h4>
+                <p class="text-sm">A: The AI needs complete data (Age, Salary, Investment Goal) to run. Please update all fields on the Profile screen.</p>
+                
+                <h4 class="font-semibold text-primary">Q: How do I change my profile details?</h4>
+                <p class="text-sm">A: Use the "Edit Profile" button on the Dashboard. The form pre-fills with your current data.</p>
+                
+                <p class="text-sm border-t pt-4 mt-4 text-gray-500">This app was developed by **QuadSquad** for the Mini Project (BCS586).</p>
+            </div>
+        </div>
+    </div>
+    
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,68 @@
+/* --- CUSTOM COLOR PALETTE: Inspired by Indian Banknotes --- */
+
+:root {
+    /* Primary (Stone Green/Grey - Inspired by ₹500 Note) */
+    --color-primary: #5C6260;    /* Dark Stone Grey/Green */
+    --color-primary-light: #7E9C88; /* Softer Sage Green */
+    --color-primary-accent: #B0C4A4; /* Very Light Mint */
+    
+    /* Secondary (Bright Yellow/Orange - Inspired by ₹200 Note) */
+    --color-secondary: #FFC107; /* Bright Amber/Gold */
+    --color-secondary-dark: #FF9800; /* Deep Orange */
+    
+    /* Highlight/Success (Clean Cyan - Inspired by ₹50 Note) */
+    --color-success: #00BCD4;   /* Cyan Teal for Success/Highlights */
+    
+    /* Backgrounds and Text */
+    --color-background: #F8F8F8; /* Light Off-White */
+    --color-surface: #FFFFFF; /* White */
+    --color-text-dark: #333333; /* Dark Grey for readability */
+    --color-error: #EF4444; /* Red */
+}
+
+/* --- GLOBAL STYLES --- */
+body { 
+    font-family: 'Inter', sans-serif; 
+    background-color: var(--color-background);
+}
+
+/* --- APP SCREEN NAVIGATION STYLES (JavaScript controls visibility) --- */
+.app-screen { 
+    display: none; 
+    flex-direction: column; 
+    height: 100%;
+}
+.app-screen.active { 
+    display: flex; 
+}
+
+/* --- CUSTOMIZING TAILWIND CLASSES WITH CSS VARIABLES --- */
+/* Primary Colors (Headers, Buttons) */
+.bg-primary { background-color: var(--color-primary); }
+.bg-primary-light { background-color: var(--color-primary-light); }
+.bg-primary-accent { background-color: var(--color-primary-accent); }
+.hover\:bg-primary:hover { background-color: var(--color-primary); }
+.hover\:bg-primary-light:hover { background-color: var(--color-primary-light); }
+
+.text-primary { color: var(--color-primary); }
+.text-primary-light { color: var(--color-primary-light); }
+.border-primary { border-color: var(--color-primary); }
+
+/* Success/Error/Highlight Colors */
+.bg-success { background-color: var(--color-success); }
+.text-success { color: var(--color-success); }
+.bg-error { background-color: var(--color-error); }
+.text-error { color: var(--color-error); }
+
+/* Utility Classes */
+.bg-yellow-50 { background-color: var(--color-secondary); } /* Used for the update section background */
+.text-yellow-800 { color: var(--color-secondary-dark); }
+.border-yellow-200 { border-color: var(--color-secondary-dark); }
+
+/* Input Focus Rings */
+.focus\:ring-primary:focus { --tw-ring-color: var(--color-primary); }
+.focus\:border-primary:focus { border-color: var(--color-primary); }
+
+/* Enrolled Schemes background (using the Light Primary) */
+.bg-indigo-100 { background-color: var(--color-primary-accent); }
+.text-indigo-800 { color: var(--color-primary); }
