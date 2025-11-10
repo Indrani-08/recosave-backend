@@ -1,5 +1,5 @@
 // --- CONFIGURATION & STATE ---
-const API_BASE_URL = 'http://10.247.65.243:5000/login'; 
+const API_BASE_URL = 'https://recosave-backend.onrender.com/'; 
 let currentUserId = localStorage.getItem('currentUserId');
 let currentUsername = localStorage.getItem('currentUsername');
 let searchTimeout;
