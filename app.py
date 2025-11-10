@@ -1,8 +1,8 @@
 import sqlite3
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from www.database import init_db, get_db_connection
-from www.recommendations import generate_ai_recommendation, find_schemes
+from database import init_db, get_db_connection
+from recommendations import generate_ai_recommendation, find_schemes
 
 app = Flask(__name__)
 
