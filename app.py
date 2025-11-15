@@ -1,250 +1,259 @@
-import sqlite3
+# app.py (updated — uses scheme_name for enrollments)
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from database import init_db, get_db_connection
+from database import get_connection, init_db
 from recommendations import generate_ai_recommendation, find_schemes
+import mysql.connector
 
 app = Flask(__name__)
-
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-# Initialize DB once at startup
+# Initialize DB (your init_db may be a no-op if you manage tables manually)
 init_db()
 
 
-# ---------------- UTILITY FUNCTION ----------------
 def execute_db_query(query, params=(), fetch_one=False):
-    """Executes a database query and returns fetched results (if applicable)."""
-    conn = get_db_connection()
-    conn.row_factory = sqlite3.Row
+    """
+    MySQL helper:
+    - For SELECT queries: fetch rows (no commit)
+    - For INSERT/UPDATE/DELETE: commit and return True
+    """
+    conn = get_connection()
+    if conn is None:
+        raise RuntimeError("DB connection failed")
     cursor = conn.cursor()
     try:
         cursor.execute(query, params)
-        conn.commit()
-        if fetch_one:
-            return cursor.fetchone()
-        return cursor.fetchall()
-    except sqlite3.IntegrityError as e:
-        conn.rollback()
-        raise e
+
+        is_select = query.strip().lower().startswith("select")
+        if is_select:
+            result = cursor.fetchone() if fetch_one else cursor.fetchall()
+            return result
+        else:
+            conn.commit()
+            return True
     except Exception as e:
         conn.rollback()
         raise e
     finally:
+        cursor.close()
         conn.close()
 
 
-# ---------------- API ROUTES ----------------
-
 @app.route('/')
 def home():
-    return jsonify({"message": "RecoSave AI Backend is Running. Use API endpoints for functionality."}), 200
+    return jsonify({"message": "RecoSave AI Backend Running"}), 200
 
 
-# ---------------- USER AUTH ----------------
+# -------- Authentication and profile endpoints (unchanged semantics) --------
 
 @app.route('/register', methods=['POST'])
 def register():
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
-    salary = data.get('salary')
-    age = data.get('age')
-    gender = data.get('gender')
-    investment_goal = data.get('investment_goal')
+    data = request.json or {}
+    username = data.get("username")
+    password = data.get("password")
+    salary = data.get("salary")
+    age = data.get("age")
+    gender = data.get("gender")
+    goal = data.get("investment_goal")
 
     if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
+        return jsonify({"error": "Username and password required"}), 400
 
     try:
-        query = """
-        INSERT INTO users (username, password, salary, age, gender, investment_goal)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """
-        execute_db_query(query, (username, password, salary, age, gender, investment_goal))
-
-        user = execute_db_query("SELECT id FROM users WHERE username = ?", (username,), fetch_one=True)
-        new_user_id = user["id"]
-        return jsonify({"message": "User registered successfully!", "user_id": new_user_id}), 201
-
-    except sqlite3.IntegrityError:
+        execute_db_query("""
+            INSERT INTO users (username, password, salary, age, gender, investment_goal)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (username, password, salary, age, gender, goal))
+        row = execute_db_query("SELECT id FROM users WHERE username=%s", (username,), fetch_one=True)
+        return jsonify({"message": "Registered!", "user_id": row[0]}), 201
+    except mysql.connector.IntegrityError:
         return jsonify({"error": "Username already exists"}), 409
     except Exception as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/login', methods=['POST'])
 def login():
-    data = request.json
-    username = data.get('username')
-    password = data.get('password')
+    data = request.json or {}
+    username = data.get("username")
+    password = data.get("password")
 
-    if not username or not password:
-        return jsonify({"error": "Username and password are required"}), 400
+    row = execute_db_query("SELECT id FROM users WHERE username=%s AND password=%s", (username, password), fetch_one=True)
+    if row:
+        return jsonify({"message": "Login OK", "user_id": row[0]}), 200
+    return jsonify({"error": "Invalid credentials"}), 401
 
-    query = "SELECT id FROM users WHERE username = ? AND password = ?"
-    user = execute_db_query(query, (username, password), fetch_one=True)
-
-    if user:
-        return jsonify({"message": "Login successful!", "user_id": user["id"]}), 200
-    else:
-        return jsonify({"error": "Invalid username or password"}), 401
-
-
-# ---------------- USER DATA UPDATE ----------------
 
 @app.route('/salary_input', methods=['POST'])
 def salary_input():
-    data = request.json
-    user_id = data.get('user_id')
-    salary = data.get('salary')
-    age = data.get('age')
-    gender = data.get('gender')
-    investment_goal = data.get('investment_goal')
+    data = request.json or {}
+    user_id = data.get("user_id")
+    salary = data.get("salary")
+    age = data.get("age")
+    gender = data.get("gender")
+    goal = data.get("investment_goal")
 
     if not user_id:
-        return jsonify({"error": "User ID is required"}), 400
+        return jsonify({"error": "User ID required"}), 400
 
     try:
-        query = """
-        UPDATE users
-        SET salary = ?, age = ?, gender = ?, investment_goal = ?
-        WHERE id = ?
-        """
-        execute_db_query(query, (salary, age, gender, investment_goal, user_id))
-        return jsonify({"message": "User data updated successfully!"}), 200
+        execute_db_query("""
+            UPDATE users SET salary=%s, age=%s, gender=%s, investment_goal=%s WHERE id=%s
+        """, (salary, age, gender, goal, user_id))
+        return jsonify({"message": "Updated!"}), 200
     except Exception as e:
-        return jsonify({"error": f"Database error: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ---------------- ENROLLMENT ROUTES (Persistent Save) ----------------
+@app.route('/user_profile/<int:user_id>', methods=['GET'])
+def user_profile(user_id):
+    row = execute_db_query("SELECT id, username, salary, age, gender, investment_goal FROM users WHERE id=%s", (user_id,), fetch_one=True)
+    if not row:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({
+        "id": row[0],
+        "username": row[1],
+        "salary": row[2],
+        "age": row[3],
+        "gender": row[4],
+        "investment_goal": row[5]
+    }), 200
+
+
+# -------- Enrollments: store scheme_name (string) instead of scheme_id --------
 
 @app.route('/enroll_scheme', methods=['POST'])
 def enroll_scheme():
-    """Saves a scheme enrollment persistently for a user."""
-    data = request.json
-    user_id = data.get('user_id')
-    scheme_name = data.get('scheme_name')
+    """
+    Expects JSON: { "user_id": <int>, "scheme_name": "<string>" }
+    """
+    data = request.json or {}
+    user_id = data.get("user_id")
+    scheme_name = data.get("scheme_name")
 
     if not user_id or not scheme_name:
         return jsonify({"error": "User ID and scheme name are required."}), 400
 
     try:
-        # Prevent duplicates
         existing = execute_db_query(
-            "SELECT * FROM enrollments WHERE user_id = ? AND scheme_name = ?",
-            (user_id, scheme_name),
-            fetch_one=True,
+            "SELECT id FROM enrolled_schemes WHERE user_id=%s AND scheme_name=%s",
+            (user_id, scheme_name), fetch_one=True
         )
         if existing:
-            return jsonify({"error": f"Scheme '{scheme_name}' is already enrolled."}), 409
+            return jsonify({"message": "Scheme already enrolled."}), 200
 
         execute_db_query(
-            "INSERT INTO enrollments (user_id, scheme_name) VALUES (?, ?)",
-            (user_id, scheme_name),
+            "INSERT INTO enrolled_schemes (user_id, scheme_name) VALUES (%s, %s)",
+            (user_id, scheme_name)
         )
-        return jsonify({"message": f"Scheme '{scheme_name}' enrolled successfully."}), 201
 
+        return jsonify({"message": "Scheme enrolled successfully."}), 201
     except Exception as e:
-        return jsonify({"error": f"Failed to enroll scheme: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route('/get_enrollments/<int:user_id>', methods=['GET'])
 def get_enrollments(user_id):
-    """Retrieves all enrolled schemes for a user."""
+    """
+    Returns a list of enrolled schemes for the user, enriched with data from recommendations.find_schemes()
+    Each item: { "scheme_name": ..., "category": ..., "description": ..., "created_at": ... }
+    """
     try:
-        results = execute_db_query(
-            "SELECT scheme_name FROM enrollments WHERE user_id = ?", (user_id,)
-        )
-        schemes = [row["scheme_name"] for row in results]
-        return jsonify({"enrolled_schemes": schemes}), 200
+        rows = execute_db_query("SELECT scheme_name, created_at FROM enrolled_schemes WHERE user_id=%s ORDER BY created_at DESC", (user_id,))
+        enrolled = []
+        for r in rows:
+            scheme_name = r[0]
+            created_at = r[1].isoformat() if hasattr(r[1], 'isoformat') else str(r[1])
+
+            # Try to fetch details from recommendations.find_schemes()
+            details = find_schemes(scheme_name)  # returns list of matches
+            info = {}
+            if details:
+                # find exact name match (case-insensitive) else pick first
+                match = None
+                for d in details:
+                    # recommendations.find_schemes uses 'name' or 'scheme_name' keys depending on implementation;
+                    # handle both possibilities
+                    name_field = d.get("scheme_name") or d.get("name") or ""
+                    if name_field.lower() == scheme_name.lower():
+                        match = d
+                        break
+                if not match:
+                    match = details[0]
+                info["scheme_name"] = match.get("scheme_name") or match.get("name") or scheme_name
+                info["category"] = match.get("key_benefit") or match.get("category") or None
+                info["description"] = match.get("short_description") or match.get("desc") or match.get("description") or ""
+            else:
+                info["scheme_name"] = scheme_name
+                info["category"] = None
+                info["description"] = ""
+
+            info["created_at"] = created_at
+            enrolled.append(info)
+
+        return jsonify({"enrolled_schemes": enrolled}), 200
     except Exception as e:
-        return jsonify({"error": f"Failed to retrieve enrollments: {str(e)}"}), 500
+        return jsonify({"error": str(e)}), 500
 
 
-# ---------------- AI RECOMMENDATION ----------------
-
-@app.route('/recommendations/<int:user_id>', methods=['GET'])
-def get_recommendations(user_id):
-    query = "SELECT salary, age, gender, investment_goal FROM users WHERE id = ?"
-    user_data = execute_db_query(query, (user_id,), fetch_one=True)
-
-    if not user_data:
-        return jsonify({"error": "User not found"}), 404
-
-    user_data_dict = dict(user_data)
-
-    if not all(
-        [user_data_dict.get("age"), user_data_dict.get("salary"), user_data_dict.get("investment_goal")]
-    ):
-        return jsonify(
-            {"error": "Missing essential profile data (salary, age, or goal) required for AI analysis."}
-        ), 400
-
-    ai_response = generate_ai_recommendation(user_data_dict)
-    if "error" in ai_response:
-        return jsonify(ai_response), 500
-
-    return jsonify({"recommendation_analysis": ai_response}), 200
-
-
-# ---------------- SCHEME SEARCH ----------------
+# -------- Search uses recommendations.find_schemes (keeps using the static DB in recommendations.py) --------
 
 @app.route('/search', methods=['GET'])
 def search_schemes():
-    query = request.args.get('q')
-    if not query:
-        return jsonify({"results": [], "message": "Enter a search term (e.g., 'tax', 'age 60')."}), 200
+    q = request.args.get('q', '') or ''
+    try:
+        results = find_schemes(q)
+        # Ensure consistent keys expected by frontend: id (if available), scheme_name, short_description, key_benefit
+        normalized = []
+        for r in results:
+            # if r already has id or name keys, keep them; else create a stable id = None
+            normalized.append({
+                "id": r.get("id"),  # may be None since we're not using DB ids anymore
+                "scheme_name": r.get("scheme_name") or r.get("name"),
+                "short_description": r.get("short_description") or r.get("desc") or r.get("description") or "",
+                "key_benefit": r.get("key_benefit") or r.get("tag") or r.get("category") or ""
+            })
+        return jsonify({"results": normalized}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    results = find_schemes(query)
-    return jsonify({"results": results}), 200
 
+# -------- AI recommendation (unchanged) --------
 
-# ---------------- USER PROFILE ----------------
-
-@app.route('/user_profile/<int:user_id>', methods=['GET'])
-def user_profile(user_id):
-    query = "SELECT id, username, salary, age, gender, investment_goal FROM users WHERE id = ?"
-    user = execute_db_query(query, (user_id,), fetch_one=True)
-
-    if user:
-        return jsonify(dict(user)), 200
-    else:
+@app.route('/recommendations/<int:user_id>', methods=['GET'])
+def recommendations(user_id):
+    row = execute_db_query("SELECT salary, age, gender, investment_goal FROM users WHERE id=%s", (user_id,), fetch_one=True)
+    if not row:
         return jsonify({"error": "User not found"}), 404
-    
+
+    user_data = {
+        "salary": row[0],
+        "age": row[1],
+        "gender": row[2],
+        "investment_goal": row[3]
+    }
+
+    ai = generate_ai_recommendation(user_data)
+    return jsonify({"recommendation_analysis": ai}), 200
+
+
+# -------- Change password (unchanged) --------
 @app.route('/change_password', methods=['POST'])
 def change_password():
-    """
-    Handles user password change request.
-    """
-    data = request.json
+    data = request.json or {}
     user_id = data.get('user_id')
-    new_password = data.get('new_password')
+    new_pass = data.get('new_password')
 
-    if not user_id or not new_password:
-        return jsonify({"error": "User ID and new password are required"}), 400
+    if not user_id or not new_pass:
+        return jsonify({"error": "user_id and new_password required"}), 400
 
-    conn = get_db_connection()
-    cursor = conn.cursor()
     try:
-        # Check if user exists first
-        cursor.execute("SELECT id FROM users WHERE id = ?", (user_id,))
-        if cursor.fetchone() is None:
-            return jsonify({"error": "User not found"}), 404
-        
-        # Update the password
-        update_query = "UPDATE users SET password = ? WHERE id = ?"
-        cursor.execute(update_query, (new_password, user_id))
-        conn.commit()
-        
-        return jsonify({"message": "Password updated successfully! Please re-login."}), 200
-    except sqlite3.OperationalError as e:
-        return jsonify({"error": f"Database error during password change: {str(e)}"}), 500
-    finally:
-        conn.close()
+        execute_db_query("UPDATE users SET password=%s WHERE id=%s", (new_pass, user_id))
+        return jsonify({"message": "Password updated"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
-# ---------------- MAIN ----------------
 if __name__ == '__main__':
-    # Change 'debug=True' to this line:
     app.run(host='0.0.0.0', port=5000, debug=True)

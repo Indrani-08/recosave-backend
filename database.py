@@ -1,42 +1,55 @@
-import sqlite3
+import mysql.connector
+from mysql.connector import Error
 
-DATABASE = 'recosave.db'
+def get_connection():
+    try:
+        connection = mysql.connector.connect(
+            host="localhost",
+            user="root",
+            password="",
+            database="recosave"
+        )
+        return connection
+    except Error as e:
+        print("MySQL Connection Error:", e)
+        return None
+
 
 def init_db():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    # 1. Main Users Table
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY,
-            username TEXT NOT NULL UNIQUE,
-            password TEXT NOT NULL,
-            salary INTEGER,
-            age INTEGER,
-            gender TEXT,
-            investment_goal TEXT
-        );
-    ''')
+    connection = get_connection()
+    if connection is None:
+        print("❌ Failed to connect to MySQL")
+        return
 
-    # 2. Permanent Enrollments Table
-    # CRITICAL FIX: The UNIQUE constraint ensures a scheme is saved only once per user.
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS enrollments (
-            id INTEGER PRIMARY KEY,
-            user_id INTEGER NOT NULL,
-            scheme_name TEXT NOT NULL,
-            UNIQUE (user_id, scheme_name),
-            FOREIGN KEY (user_id) REFERENCES users (id)
-        );
-    ''')
-    conn.commit()
-    conn.close()
+    cursor = connection.cursor()
 
-def get_db_connection():
-    conn = sqlite3.connect(DATABASE)
-    conn.row_factory = sqlite3.Row
-    return conn
+    # USERS TABLE
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        username VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        salary INT,
+        age INT,
+        gender VARCHAR(20),
+        investment_goal VARCHAR(255)
+    ) ENGINE=InnoDB;
+    """)
 
-if __name__ == '__main__':
-    init_db()
-    print("Database initialized and 'users' and 'enrollments' tables created.")
+    # ENROLLED SCHEMES TABLE
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS enrolled_schemes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        user_id INT NOT NULL,
+        scheme_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY (scheme_id) REFERENCES schemes(id) ON DELETE CASCADE
+    ) ENGINE=InnoDB;
+    """)
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    print("✅ MySQL Database initialized & tables ready!")
