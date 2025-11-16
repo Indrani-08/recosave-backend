@@ -6,7 +6,7 @@ from recommendations import generate_ai_recommendation, find_schemes
 import mysql.connector
 
 app = Flask(__name__)
-CORS(app)
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Initialize DB (your init_db may be a no-op if you manage tables manually)
 init_db()
