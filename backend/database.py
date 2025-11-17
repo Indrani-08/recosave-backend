@@ -3,11 +3,13 @@ from mysql.connector import Error
 
 def get_connection():
     try:
+        import os
+
         connection = mysql.connector.connect(
-            host="localhost",
-            user="root",
-            password="",
-            database="recosave"
+            host=os.getenv("DB_HOST", "localhost"),
+            user=os.getenv("DB_USER", "root"),
+            password=os.getenv("DB_PASSWORD", ""),
+            database=os.getenv("DB_NAME", "recosave")
         )
         return connection
     except Error as e:
@@ -44,7 +46,6 @@ def init_db():
         scheme_id INT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        FOREIGN KEY (scheme_id) REFERENCES schemes(id) ON DELETE CASCADE
     ) ENGINE=InnoDB;
     """)
 
