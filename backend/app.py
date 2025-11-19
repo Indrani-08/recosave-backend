@@ -253,6 +253,13 @@ def change_password():
         return jsonify({"message": "Password updated"}), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@app.after_request
+def apply_cors(response):
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
+    return response
 
 
 if __name__ == '__main__':
