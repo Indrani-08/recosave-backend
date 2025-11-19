@@ -8,7 +8,7 @@ API_KEY = os.getenv("GEMINI_API_KEY")
 # Configure client
 genai.configure(api_key=API_KEY)
 
-MODEL = "gemini-1.5-flash-latest"   
+MODEL = "gemini-1.5-flash"   
 
 def generate_ai_recommendation(user_data):
     if not API_KEY:
