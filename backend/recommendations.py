@@ -5,13 +5,7 @@ import json
 # Load API key from Render environment variables
 API_KEY = os.getenv("GEMINI_API_KEY")  # make sure this env variable exists
 
-GEMINI_MODEL_URL = (
-    f"https://generativelanguage.googleapis.com/v1beta/models/"
-    f"gemini-2.0-flash:generateContent?key={API_KEY}"
-)
-
-
-MODEL = "gemini-1.5-flash"   
+MODEL = "gemini-2.0-flash"   
 
 def generate_ai_recommendation(user_data):
     if not API_KEY:
